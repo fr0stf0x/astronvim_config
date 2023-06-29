@@ -18,12 +18,51 @@ return {
   },
 
   -- Set colorscheme to use
-  colorscheme = "astrodark",
+  -- colorscheme = "oxocarbon",
+  colorscheme = "catppuccin",
 
   -- Diagnostics configuration (for vim.diagnostics.config({...})) when diagnostics are on
   diagnostics = {
-    virtual_text = true,
+    virtual_text = { severity = { min = vim.diagnostic.severity.ERROR } },
     underline = true,
+  },
+
+  icons = {
+    -- VimIcon = "",
+    ScrollText = "",
+    -- GitBranch = "",
+    GitAdd = "",
+    -- GitChange = "",
+    GitDelete = "",
+  },
+  highlights = {
+    -- set highlights for all themes
+    -- use a function override to let us use lua to retrieve colors from highlight group
+    -- there is no default table so we don't need to put a parameter for this function
+    init = function()
+      local get_hlgroup = require("astronvim.utils").get_hlgroup
+      -- get highlights from highlight groups
+      local normal = get_hlgroup "Normal"
+      local fg, bg = normal.fg, normal.bg
+      local bg_alt = get_hlgroup("Visual").bg
+      local green = get_hlgroup("String").fg
+      local red = get_hlgroup("Error").fg
+      -- return a table of highlights for telescope based on colors gotten from highlight groups
+      return {
+        TelescopeBorder = { fg = bg_alt, bg = bg },
+        TelescopeNormal = { bg = bg },
+        TelescopePreviewBorder = { fg = bg, bg = bg },
+        TelescopePreviewNormal = { bg = bg },
+        TelescopePreviewTitle = { fg = bg, bg = green },
+        TelescopePromptBorder = { fg = bg_alt, bg = bg_alt },
+        TelescopePromptNormal = { fg = fg, bg = bg_alt },
+        TelescopePromptPrefix = { fg = red, bg = bg_alt },
+        TelescopePromptTitle = { fg = bg, bg = red },
+        TelescopeResultsBorder = { fg = bg, bg = bg },
+        TelescopeResultsNormal = { bg = bg },
+        TelescopeResultsTitle = { fg = bg, bg = bg },
+      }
+    end,
   },
 
   lsp = {
@@ -41,9 +80,9 @@ return {
       },
       disabled = { -- disable formatting capabilities for the listed language servers
         -- disable lua_ls formatting capability if you want to use StyLua to format your lua code
-        -- "lua_ls",
+        "lua_ls",
       },
-      timeout_ms = 1000, -- default format timeout
+      timeout_ms = 3000, -- default format timeout
       -- filter = function(client) -- fully override the default formatting function
       --   return true
       -- end
@@ -51,6 +90,26 @@ return {
     -- enable servers that you already have installed without mason
     servers = {
       -- "pyright"
+    },
+    config = {
+      eslint = {
+        settings = {
+          codeactiononsave = {
+            mode = "problems",
+          },
+        },
+        on_attach = function(_, bufnr)
+          vim.api.nvim_create_autocmd("bufwritepre", {
+            buffer = bufnr,
+            command = "EslintFixAll",
+          })
+        end,
+      },
+      unocss = {
+        handlers = {
+          ["textDocument/documentHighlight"] = function() end,
+        },
+      },
     },
   },
 
@@ -69,17 +128,43 @@ return {
   -- augroups/autocommands and custom filetypes also this just pure lua so
   -- anything that doesn't fit in the normal config locations above can go here
   polish = function()
+    vim.cmd [[
+      nnoremap <Leader>L "ayiwoconsole.log('<C-R>a:', <C-R>a);<Esc>
+
+      xnoremap <Leader>L "ayoconsole.log('<C-R>a:', <C-R>a);<Esc>
+    ]]
+
+    vim.api.nvim_create_user_command("CloseAllFloatingWindows", function()
+      local closed_windows = {}
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        local config = vim.api.nvim_win_get_config(win)
+        if config.relative ~= "" then -- is_floating_window?
+          vim.api.nvim_win_close(win, false) -- do not force
+          table.insert(closed_windows, win)
+        end
+      end
+      print(string.format("Closed %d windows: %s", #closed_windows, vim.inspect(closed_windows)))
+    end, {})
+
     -- Set up custom filetypes
-    -- vim.filetype.add {
-    --   extension = {
-    --     foo = "fooscript",
-    --   },
-    --   filename = {
-    --     ["Foofile"] = "fooscript",
-    --   },
-    --   pattern = {
-    --     ["~/%.config/foo/.*"] = "fooscript",
-    --   },
-    -- }
+    vim.filetype.add {
+      extension = {
+        mdx = "mdx",
+      },
+    }
+
+    vim.treesitter.language.register("markdown", "mdx")
+
+    vim.g.markdown_fenced_languages = {
+      "ts=typescript",
+      "javascript",
+      "typescript",
+      "bash",
+      "lua",
+      "go",
+      "rust",
+      "c",
+      "cpp",
+    }
   end,
 }
